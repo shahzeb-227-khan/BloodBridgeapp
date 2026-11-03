@@ -1,14 +1,17 @@
 import { Stack } from "expo-router";
-import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
+import Constants from "expo-constants";
 
 import AppSplashScreen from "../components/AppSplashScreen";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 
 const SPLASH_MINIMUM_DURATION_MS = 4500;
 const splashStartedAt = Date.now();
+
+// True when running inside standard Expo Go (not a dev build)
+const isExpoGo = Constants.executionEnvironment === "storeClient";
 
 void SplashScreen.preventAutoHideAsync().catch((error) => {
   console.warn("[Splash] Could not keep the splash screen visible.", error);
@@ -62,13 +65,18 @@ const styles = StyleSheet.create({
 
 export default function RootLayout() {
   useEffect(() => {
-    if (Platform.OS !== "android") return;
+    // expo-notifications push support was removed from Expo Go in SDK 53.
+    // Skip the channel setup entirely when running in Expo Go to avoid a crash.
+    if (Platform.OS !== "android" || isExpoGo) return;
 
-    void Notifications.setNotificationChannelAsync("default", {
-      name: "BloodBridge notifications",
-      importance: Notifications.AndroidImportance.MAX,
-    }).catch((error) => {
-      console.warn("[Notifications] Could not configure the Android channel.", error);
+    // Dynamic import so the module is never even loaded in Expo Go.
+    void import("expo-notifications").then((Notifications) => {
+      void Notifications.setNotificationChannelAsync("default", {
+        name: "BloodBridge notifications",
+        importance: Notifications.AndroidImportance.MAX,
+      }).catch((error) => {
+        console.warn("[Notifications] Could not configure the Android channel.", error);
+      });
     });
   }, []);
 
